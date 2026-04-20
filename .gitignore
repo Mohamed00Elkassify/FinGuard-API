@@ -21,3 +21,5 @@ build/
 *.egg
 *.tar.gz
 *.whl
+
+notes.md
