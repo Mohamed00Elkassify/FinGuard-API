@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.db import transaction
 from .models import Account, Transaction
+from decimal import Decimal, ROUND_HALF_UP
 
 class AccountSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
@@ -17,13 +18,18 @@ class AccountSerializer(serializers.ModelSerializer):
         
         return data
 
+EXCHANGE_RATES = {
+    'USD': Decimal('1.00'),
+    'EUR': Decimal('0.85'),
+    'GBP': Decimal('0.74'),
+}
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ['sender', 'receiver', 'amount', 'transaction_type']
 
-    # Validate that sender and receiver are not the same account
+    
     def validate(self, data):
         user = self.context['request'].user
         sender = data.get('sender')
@@ -64,6 +70,12 @@ class TransactionSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError('Insufficient balance')
                 sender_acc.balance -= amount
                 sender_acc.save()
+
+            
+            if sender and receiver and sender.currency != receiver.currency:
+                amount_in_usd = amount / EXCHANGE_RATES[sender.currency]
+                amount = amount_in_usd * EXCHANGE_RATES[receiver.currency]
+                amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
             # Money In
             if receiver:
