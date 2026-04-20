@@ -25,6 +25,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     # Validate that sender and receiver are not the same account
     def validate(self, data):
+        user = self.context['request'].user
         sender = data.get('sender')
         receiver = data.get('receiver')
         transaction_type = data.get('transaction_type')
@@ -36,6 +37,14 @@ class TransactionSerializer(serializers.ModelSerializer):
         # Logic for Transfers transactions
         if transaction_type == 'TRANSFER' and (not sender or not receiver):
             raise serializers.ValidationError('A transfer requires both sender and receiver')
+        
+        # Check ownership of sender account
+        if sender and sender.user != user:
+            raise serializers.ValidationError('You are not the owner of the sender account')
+        
+        # Check ownership of receiver account
+        if transaction_type == 'DEPOSIT' and receiver and receiver.user != user:
+            raise serializers.ValidationError('You are not the owner of the receiver account')
         
         return data
 
